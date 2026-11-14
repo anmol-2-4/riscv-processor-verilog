@@ -15,7 +15,7 @@ module instruction_memory (
         $readmemh("program.hex", memory);
     end
 
-    // This simple teaching memory is word-addressed using byte addresses.
+    // PC uses byte addresses; bits [7:2] select a 32-bit instruction word.
     assign instruction = memory[address[7:2]];
 
 endmodule

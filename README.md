@@ -1,15 +1,20 @@
 # 32-bit RISC-V Processor (Intermediate Verilog Project)
 
-A beginner-friendly **single-cycle processor** written in Verilog. It implements a small, clearly defined subset of the RV32I instruction set:
+A beginner-friendly **single-cycle processor** written in Verilog. It implements a selected subset of the RV32I instruction set:
 
-- `ADD` — add two registers
-- `SUB` — subtract two registers
-- `ADDI` — add an immediate constant
-- `LW` — load one 32-bit word from data memory
-- `SW` — store one 32-bit word to data memory
-- `BEQ` — branch when two registers are equal
+| Instruction | Purpose |
+|---|---|
+| `ADD` | Add two registers |
+| `SUB` | Subtract two registers |
+| `ADDI` | Add a sign-extended immediate constant |
+| `AND` | Bitwise AND of two registers |
+| `OR` | Bitwise OR of two registers |
+| `XOR` | Bitwise XOR of two registers |
+| `LW` | Load one 32-bit word from data memory |
+| `SW` | Store one 32-bit word to data memory |
+| `BEQ` | Branch when two registers are equal |
 
-This is a teaching implementation of a subset of RV32I, not a complete RV32I processor.
+This is a teaching implementation of a selected subset of RV32I, not a complete RV32I processor.
 
 ## 1. What happens in one instruction?
 
@@ -17,8 +22,8 @@ The design uses the single-cycle idea. During one clock cycle, an instruction pa
 
 1. **Fetch:** the Program Counter (PC) selects an instruction from instruction memory.
 2. **Decode:** the Control Unit reads the opcode and function fields.
-3. **Read operands:** the Register File provides the source-register values; the Immediate Generator extracts a constant/offset when needed.
-4. **Execute:** the ALU performs addition or subtraction. For `BEQ`, subtraction is used to test equality.
+3. **Read operands:** the Register File provides source-register values; the Immediate Generator extracts a constant or offset when needed.
+4. **Execute:** the ALU performs arithmetic or bitwise logic. For `BEQ`, subtraction is used to test equality.
 5. **Memory access:** `LW` reads data memory; `SW` writes data memory.
 6. **Write-back:** the ALU result or memory result is written to the destination register when required.
 
@@ -48,9 +53,9 @@ riscv_intermediate_project/
 ## 3. Tools required
 
 - Icarus Verilog (`iverilog` and `vvp`) for compilation and simulation.
-- GTKWave for viewing the waveform (optional, but useful for demonstration).
+- GTKWave for viewing the waveform.
 
-On Ubuntu, if these tools are not installed, they can usually be installed with:
+On Ubuntu, install them with:
 
 ```bash
 sudo apt update
@@ -59,16 +64,17 @@ sudo apt install iverilog gtkwave make
 
 ## 4. Run the simulation
 
-Open a terminal in this project folder, then run:
+Open a terminal in the project root directory, then run:
 
 ```bash
+make clean
 make test
 ```
 
 A successful run ends with:
 
 ```text
-PASS: all RISC-V processor checks succeeded.
+PASS: all nine RISC-V instruction checks succeeded.
 ```
 
 To open the waveform after running the test:
@@ -77,19 +83,13 @@ To open the waveform after running the test:
 make wave
 ```
 
-The waveform file is `build/wave.vcd`. In GTKWave, useful signals include `pc_debug`, `instruction_debug`, `alu_result_debug`, `writeback_debug`, `reg_write_debug`, and `mem_write_debug`.
+The waveform file is `build/wave.vcd`. In GTKWave, useful signals include `pc_debug`, `instruction_debug`, `alu_result_debug`, `writeback_debug`, `reg_write_debug`, `mem_write_debug`, and `destination_debug`.
 
-To remove generated simulation files:
-
-```bash
-make clean
-```
-
-**Important:** run `make` from the project root directory because the instruction memory reads `program.hex` using a relative path.
+Run Make from the project root because instruction memory loads `program.hex` using a relative path.
 
 ## 5. Demonstration program
 
-The source-like listing is in `program.asm`; the corresponding 32-bit machine-code words are in `program.hex`.
+The assembly-like listing is in `program.asm`; corresponding 32-bit machine-code words are in `program.hex`.
 
 | Address | Instruction | Purpose |
 |---:|---|---|
@@ -105,8 +105,17 @@ The source-like listing is in `program.asm`; the corresponding 32-bit machine-co
 | 36 | `BEQ x1, x2, 8` | Not taken because 5 is not 3 |
 | 40 | `ADDI x7, x0, 7` | x7 becomes 7 |
 | 44 | `ADDI x0, x0, 0` | NOP; x0 remains zero |
+| 48 | `AND x9, x1, x2` | x9 becomes 1 |
+| 52 | `OR x10, x1, x2` | x10 becomes 7 |
+| 56 | `XOR x11, x1, x2` | x11 becomes 6 |
 
-The testbench checks the register results, data memory, x0 behaviour, and both taken and not-taken `BEQ` behaviour.
+For the logical instructions, x1 is 5 (`0101`) and x2 is 3 (`0011`):
+
+- AND: `0101 & 0011 = 0001` (1)
+- OR: `0101 | 0011 = 0111` (7)
+- XOR: `0101 ^ 0011 = 0110` (6)
+
+The testbench checks register results, data memory, x0 behaviour, both taken and not-taken BEQ behaviour, and the three logical operations.
 
 ## 6. Module responsibilities
 
@@ -117,49 +126,59 @@ The testbench checks the register results, data memory, x0 behaviour, and both t
 | `control_unit.v` | Decodes supported instructions and generates control signals |
 | `reg_file.v` | Holds 32 32-bit registers; x0 always reads as zero |
 | `imm_gen.v` | Extracts and sign-extends I-, S- and B-type immediates |
-| `alu.v` | Performs ADD and SUB operations |
-| `branch_unit.v` | Takes a BEQ branch when the ALU result is zero |
+| `alu.v` | Performs ADD, SUB, AND, OR and XOR |
+| `branch_unit.v` | Takes a BEQ branch when the ALU says the operands are equal |
 | `data_memory.v` | Stores and loads aligned 32-bit words |
-| `riscv_cpu.v` | Connects all the modules into the processor |
-| `tb_riscv_cpu.v` | Runs a program and checks expected results |
+| `riscv_cpu.v` | Connects all modules into the processor |
+| `tb_riscv_cpu.v` | Runs the program and checks expected results |
 
-## 7. Scope and limitations
+## 7. Instruction encoding details
 
-To keep this project appropriate for learning the datapath and control logic, it intentionally does **not** implement the complete RV32I instruction set.
+The five register-register instructions share the R-type opcode `0110011`. The Control Unit uses `funct3` and `funct7` to distinguish them.
 
-- Only the six instructions listed above are supported.
-- Data memory supports aligned 32-bit `LW` and `SW` only; byte and halfword operations are not implemented.
-- Only `BEQ` is implemented; other branch conditions are not implemented.
-- There is no pipelining, interrupt handling, exception handling, or privileged architecture.
-- Instruction memory and data memory are simple simulation-oriented arrays. Their implementation may need changes for a particular FPGA board or memory primitive.
+| Instruction | opcode | funct3 | funct7 |
+|---|---|---|---|
+| ADD | `0110011` | `000` | `0000000` |
+| SUB | `0110011` | `000` | `0100000` |
+| AND | `0110011` | `111` | `0000000` |
+| OR | `0110011` | `110` | `0000000` |
+| XOR | `0110011` | `100` | `0000000` |
 
-## 8. Suggested explanation for a lab demonstration
+These are the internal ALU control codes selected by this implementation:
 
-"We designed a small single-cycle 32-bit RISC-V processor using Verilog. It implements six instructions: ADD, SUB, ADDI, LW, SW and BEQ. The Program Counter fetches an instruction, the Control Unit decodes it, the Register File supplies operands, and the ALU performs the required operation. Load and store instructions access data memory, and the write-back path updates the destination register. The Program Counter normally advances by four bytes, but changes to the branch target when BEQ is true. We verify the design with a Verilog testbench in Icarus Verilog and inspect signals using GTKWave."
+| ALU control | Operation |
+|---|---|
+| `000` | ADD |
+| `001` | SUB |
+| `010` | AND |
+| `011` | OR |
+| `100` | XOR |
 
-## 9. Learning advice
+The internal ALU control codes are implementation choices; they are not the same as the instruction's `funct3` field.
 
-Do not try to memorise every file at once. Understand the modules in this order:
+## 8. Scope and limitations
 
-1. `alu.v`
-2. `reg_file.v`
-3. `program_counter.v`
-4. `imm_gen.v`
-5. `control_unit.v`
-6. `riscv_cpu.v`
-7. `tb/tb_riscv_cpu.v`
+This is a teaching implementation of a selected nine-instruction subset of RV32I, not the complete base ISA.
 
-For a presentation, be especially ready to explain how `ADDI x1, x0, 5` and `ADD x3, x1, x2` travel through the datapath.
+- Supported instructions: ADD, SUB, ADDI, AND, OR, XOR, LW, SW and BEQ.
+- Data memory supports aligned 32-bit LW and SW only; byte and halfword operations are not implemented.
+- Only BEQ is implemented; other branch conditions are not implemented.
+- There is no pipelining, interrupt handling, exception handling or privileged architecture.
+- Instruction memory and data memory are simple simulation-oriented arrays. They may need changes for a particular FPGA board or memory primitive.
+
+## 9. Suggested explanation for a lab demonstration
+
+"We designed a small single-cycle 32-bit RISC-V processor using Verilog. It implements nine selected instructions: ADD, SUB, ADDI, AND, OR, XOR, LW, SW and BEQ. The Program Counter fetches an instruction, the Control Unit decodes it, the Register File supplies operands, and the ALU performs arithmetic or bitwise logic. Load and store instructions access data memory, and the write-back path updates the destination register. The Program Counter normally advances by four bytes, but changes to the branch target when BEQ is true. We verify the design with a Verilog testbench in Icarus Verilog and inspect signals using GTKWave."
 
 ## 10. Circuit diagram and submission deliverables
 
-The processor block/datapath diagram is provided as `circuit_diagram.png` and `circuit_diagram.svg`. The editable Graphviz source is `circuit_diagram.dot`.
+The processor block/datapath diagram is provided as `circuit_diagram.png` and `circuit_diagram.svg`; its editable Graphviz source is `circuit_diagram.dot`. The overall datapath connections are unchanged by the three added ALU operations.
 
-See `SUBMISSION_CHECKLIST.md` for the professor's deliverables checklist, steps to generate `build/wave.vcd`, recommended GTKWave signals, and group-details fields. The waveform and screenshot must be generated from an actual simulation run on the group's machine; they are not pre-generated in this archive.
+See `SUBMISSION_CHECKLIST.md` for the deliverables checklist, steps to generate `build/wave.vcd`, recommended GTKWave signals and group-details fields. The waveform and screenshot must be generated from an actual simulation run on the group's machine.
 
 ## 11. Single consolidated Verilog design file
 
-For submission systems or instructors that prefer one design `.v` file, `riscv_design.v` contains all nine design modules in one file. Keep `tb/tb_riscv_cpu.v` as the separate testbench. The original `src/*.v` files are retained for easier learning and modular development.
+For submission systems or instructors that prefer one design file, `riscv_design.v` contains all nine design modules in one file. Keep `tb/tb_riscv_cpu.v` as the separate testbench. The modular files under `src/` are retained for easier learning and development.
 
 To compile the consolidated design and testbench directly:
 

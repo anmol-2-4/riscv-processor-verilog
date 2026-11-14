@@ -1,5 +1,5 @@
 digraph RiscVProcessor {
-  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.42", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labelloc=t, label="32-BIT SINGLE-CYCLE RISC-V PROCESSOR\nSupported instructions: ADD, SUB, ADDI, LW, SW, BEQ", fontsize=20];
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.42", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labelloc=t, label="32-BIT SINGLE-CYCLE RISC-V PROCESSOR\nSupported instructions: ADD, SUB, ADDI, AND, OR, XOR, LW, SW, BEQ", fontsize=20];
   node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, margin="0.14,0.10", color="#334155", penwidth=1.4];
   edge [fontname="DejaVu Sans", fontsize=9, color="#475569", penwidth=1.2, arrowsize=0.8];
 
@@ -11,7 +11,7 @@ digraph RiscVProcessor {
   rf [label="Register File\n32 × 32-bit\n2 read ports, 1 write port", fillcolor="#DCFCE7"];
   imm [label="Immediate Generator\nI-type, S-type, B-type", fillcolor="#DCFCE7"];
   srcmux [label="ALU-B MUX\n(register / immediate)", shape=diamond, fillcolor="#FDE68A"];
-  alu [label="ALU\nADD / SUB\nZero flag for BEQ", fillcolor="#FFEDD5"];
+  alu [label="ALU\nADD / SUB / AND\nOR / XOR\nZero flag for BEQ", fillcolor="#FFEDD5"];
   branch [label="BEQ Branch Decision\n(branch control AND zero)", fillcolor="#FCE7F3"];
   dmem [label="Data Memory\n64 × 32-bit words\nLW / SW", fillcolor="#FEE2E2"];
   wbmux [label="Write-back MUX\n(ALU result / memory data)", shape=diamond, fillcolor="#FDE68A"];
@@ -33,7 +33,7 @@ digraph RiscVProcessor {
   rf -> srcmux [label="read data 2"];
   imm -> srcmux [label="immediate"];
   srcmux -> alu [label="operand B"];
-  alu -> dmem [label="address / write data address"];
+  alu -> dmem [label="address"];
   rf -> dmem [label="store data", constraint=false];
   alu -> wbmux [label="ALU result"];
   dmem -> wbmux [label="load data"];

@@ -1,5 +1,5 @@
 // Top-level single-cycle processor implementing a small RV32I subset.
-// Supported instructions: ADD, SUB, ADDI, LW, SW and BEQ.
+// Supported instructions: ADD, SUB, ADDI, LW, SW, BEQ, AND, OR and XOR.
 module riscv_cpu (
     input  wire        clk,
     input  wire        reset,
@@ -36,7 +36,7 @@ module riscv_cpu (
     wire        mem_to_reg;
     wire        alu_src;
     wire        branch;
-    wire [1:0]  alu_control;
+    wire [2:0]  alu_control;
     wire [1:0]  imm_type;
     wire        take_branch;
 
@@ -80,7 +80,7 @@ module riscv_cpu (
         .instruction(instruction), .imm_type(imm_type), .immediate(immediate)
     );
 
-    // 4. Execute: the second ALU input is either a register or an immediate.
+    // 4. Execute: ALU input B is either a register or an immediate.
     assign alu_operand_b = (alu_src) ? immediate : read_data2;
 
     alu arithmetic_logic_unit (
@@ -88,7 +88,7 @@ module riscv_cpu (
         .alu_control(alu_control), .result(alu_result), .zero(alu_zero)
     );
 
-    // BEQ uses the ALU subtraction result to test whether the registers are equal.
+    // BEQ uses ALU subtraction to test whether the source registers are equal.
     branch_unit branch_checker (
         .branch_enable(branch), .operands_equal(alu_zero), .take_branch(take_branch)
     );

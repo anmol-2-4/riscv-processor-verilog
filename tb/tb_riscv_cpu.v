@@ -29,7 +29,7 @@ module tb_riscv_cpu;
         .illegal_instruction_debug(illegal_instruction_debug)
     );
 
-    // 10 ns clock period.
+    // 10 ns clock period: toggle every 5 ns.
     always #5 clk = ~clk;
 
     initial begin
@@ -43,8 +43,9 @@ module tb_riscv_cpu;
         repeat (2) @(posedge clk);
         #1 reset = 1'b0;
 
-        // Execute 11 instructions. The BEQ at address 24 skips address 28.
-        for (cycle = 0; cycle < 11; cycle = cycle + 1) begin
+        // Execute 14 instructions. The BEQ at address 24 skips address 28.
+        // AND, OR and XOR execute at addresses 48, 52 and 56.
+        for (cycle = 0; cycle < 14; cycle = cycle + 1) begin
             @(negedge clk);
             #1;
             $display("Cycle %0d: PC=%0d  instruction=%h  ALU=%0d",
@@ -55,7 +56,7 @@ module tb_riscv_cpu;
             #1;
         end
 
-        // Check register results.
+        // Check arithmetic and memory results.
         if (dut.register_file.regs[1] !== 32'd5)
             $fatal(1, "x1 expected 5, got %0d", dut.register_file.regs[1]);
         if (dut.register_file.regs[2] !== 32'd3)
@@ -71,25 +72,34 @@ module tb_riscv_cpu;
         if (dut.register_file.regs[7] !== 32'd7)
             $fatal(1, "x7 expected 7, got %0d", dut.register_file.regs[7]);
 
-        // x8 remains zero because the taken BEQ skipped the ADDI at address 28.
+        // The taken BEQ skips the ADDI at address 28, so x8 stays zero.
         if (dut.register_file.regs[8] !== 32'd0)
             $fatal(1, "BEQ did not skip the instruction as expected; x8=%0d",
                    dut.register_file.regs[8]);
 
-        // x0 must always read as zero and must not be overwritten.
+        // Verify the three bitwise logical instructions.
+        if (dut.register_file.regs[9] !== 32'd1)
+            $fatal(1, "AND failed: x9 expected 1, got %0d", dut.register_file.regs[9]);
+        if (dut.register_file.regs[10] !== 32'd7)
+            $fatal(1, "OR failed: x10 expected 7, got %0d", dut.register_file.regs[10]);
+        if (dut.register_file.regs[11] !== 32'd6)
+            $fatal(1, "XOR failed: x11 expected 6, got %0d", dut.register_file.regs[11]);
+
+        // x0 must always remain zero.
         if (dut.register_file.regs[0] !== 32'd0)
             $fatal(1, "x0 must remain zero");
 
-        // The SW instruction stored the value 8 in data memory word 0.
+        // SW stored the value 8 in data-memory word 0.
         if (dut.data_ram.memory[0] !== 32'd8)
             $fatal(1, "memory[0] expected 8, got %0d", dut.data_ram.memory[0]);
 
-        if (pc_debug !== 32'd48)
-            $fatal(1, "PC expected 48 after the test program, got %0d", pc_debug);
+        if (pc_debug !== 32'd60)
+            $fatal(1, "PC expected 60 after the test program, got %0d", pc_debug);
 
         $display("--------------------------------------------------");
-        $display("PASS: all RISC-V processor checks succeeded.");
+        $display("PASS: all nine RISC-V instruction checks succeeded.");
         $display("x1=5, x2=3, x3=8, x4=2, x5=8, x6=11, x7=7");
+        $display("AND: x9=1; OR: x10=7; XOR: x11=6");
         $display("memory[0]=8; taken and not-taken BEQ both checked.");
         $display("--------------------------------------------------");
         $finish;

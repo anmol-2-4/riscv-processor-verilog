@@ -1,31 +1,35 @@
 // Consolidated design file for submission.
-// Contains the nine synthesizable/simulation design modules.
+// Contains all nine design modules.
 // Compile this file together with tb/tb_riscv_cpu.v.
+// Do not compile this file and src/*.v together (they define duplicate modules).
 
 // ===== BEGIN src/alu.v =====
-// Arithmetic Logic Unit for the small RV32I subset.
-// ALU control: 2'b00 = ADD, 2'b01 = SUB.
+// Arithmetic Logic Unit for the supported RV32I subset.
+// ALU control: 000 = ADD, 001 = SUB, 010 = AND, 011 = OR, 100 = XOR.
 module alu (
     input  wire [31:0] a,
     input  wire [31:0] b,
-    input  wire [1:0]  alu_control,
+    input  wire [2:0]  alu_control,
     output reg  [31:0] result,
     output wire        zero
 );
 
+    // Combinational ALU: result follows the current operands and control.
     always @(*) begin
         case (alu_control)
-            2'b00: result = a + b;
-            2'b01: result = a - b;
+            3'b000: result = a + b;
+            3'b001: result = a - b;
+            3'b010: result = a & b;
+            3'b011: result = a | b;
+            3'b100: result = a ^ b;
             default: result = 32'b0;
         endcase
     end
 
-    // Used by BEQ: subtracting equal values produces zero.
+    // BEQ uses this flag after the ALU subtracts its two source operands.
     assign zero = (result == 32'b0);
 
 endmodule
-
 // ===== END src/alu.v =====
 
 // ===== BEGIN src/reg_file.v =====
@@ -61,7 +65,6 @@ module reg_file (
     assign read_data2 = (read_addr2 == 5'd0) ? 32'b0 : regs[read_addr2];
 
 endmodule
-
 // ===== END src/reg_file.v =====
 
 // ===== BEGIN src/program_counter.v =====
@@ -81,12 +84,11 @@ module program_counter (
     end
 
 endmodule
-
 // ===== END src/program_counter.v =====
 
 // ===== BEGIN src/imm_gen.v =====
 // Immediate generator for the I, S and B instruction formats used here.
-// imm_type: 2'b00 = I-type, 2'b01 = S-type, 2'b10 = B-type.
+// imm_type: 00 = I-type, 01 = S-type, 10 = B-type.
 module imm_gen (
     input  wire [31:0] instruction,
     input  wire [1:0]  imm_type,
@@ -95,13 +97,13 @@ module imm_gen (
 
     always @(*) begin
         case (imm_type)
-            // ADDI and LW
+            // ADDI and LW: sign-extend the 12-bit I-type immediate.
             2'b00: immediate = {{20{instruction[31]}}, instruction[31:20]};
 
             // SW: immediate bits are split between instruction[31:25] and [11:7].
             2'b01: immediate = {{20{instruction[31]}}, instruction[31:25], instruction[11:7]};
 
-            // BEQ: branch offsets are multiples of two bytes; bit 0 is zero.
+            // BEQ: reconstruct the signed B-type offset; bit 0 is implicitly zero.
             2'b10: immediate = {{19{instruction[31]}}, instruction[31], instruction[7],
                                 instruction[30:25], instruction[11:8], 1'b0};
 
@@ -110,12 +112,11 @@ module imm_gen (
     end
 
 endmodule
-
 // ===== END src/imm_gen.v =====
 
 // ===== BEGIN src/control_unit.v =====
-// Main decoder for the six supported instructions:
-// ADD, SUB, ADDI, LW, SW and BEQ.
+// Main decoder for the nine supported instructions:
+// ADD, SUB, ADDI, LW, SW, BEQ, AND, OR and XOR.
 module control_unit (
     input  wire [6:0] opcode,
     input  wire [2:0] funct3,
@@ -125,78 +126,87 @@ module control_unit (
     output reg        mem_to_reg,
     output reg        alu_src,
     output reg        branch,
-    output reg [1:0]  alu_control,
+    output reg [2:0]  alu_control,
     output reg [1:0]  imm_type,
     output reg        illegal_instruction
 );
 
     always @(*) begin
-        // Safe defaults: an unsupported instruction changes no register or memory.
+        // Safe defaults: unsupported instructions do not alter registers or memory.
         reg_write           = 1'b0;
         mem_write           = 1'b0;
         mem_to_reg          = 1'b0;
         alu_src             = 1'b0;
         branch              = 1'b0;
-        alu_control         = 2'b00;
+        alu_control         = 3'b000;
         imm_type            = 2'b00;
         illegal_instruction = 1'b0;
 
         case (opcode)
-            // R-type: ADD and SUB
+            // R-type: ADD, SUB, AND, OR and XOR.
             7'b0110011: begin
                 if (funct3 == 3'b000 && funct7 == 7'b0000000) begin
                     reg_write   = 1'b1;
-                    alu_control = 2'b00; // ADD
+                    alu_control = 3'b000; // ADD
                 end else if (funct3 == 3'b000 && funct7 == 7'b0100000) begin
                     reg_write   = 1'b1;
-                    alu_control = 2'b01; // SUB
+                    alu_control = 3'b001; // SUB
+                end else if (funct3 == 3'b111 && funct7 == 7'b0000000) begin
+                    reg_write   = 1'b1;
+                    alu_control = 3'b010; // AND
+                end else if (funct3 == 3'b110 && funct7 == 7'b0000000) begin
+                    reg_write   = 1'b1;
+                    alu_control = 3'b011; // OR
+                end else if (funct3 == 3'b100 && funct7 == 7'b0000000) begin
+                    reg_write   = 1'b1;
+                    alu_control = 3'b100; // XOR
                 end else begin
                     illegal_instruction = 1'b1;
                 end
             end
 
-            // I-type: ADDI
+            // I-type: ADDI.
             7'b0010011: begin
                 if (funct3 == 3'b000) begin
                     reg_write   = 1'b1;
                     alu_src     = 1'b1;
-                    alu_control = 2'b00;
+                    alu_control = 3'b000;
                     imm_type    = 2'b00;
                 end else begin
                     illegal_instruction = 1'b1;
                 end
             end
 
-            // I-type load: LW
+            // I-type load: LW.
             7'b0000011: begin
                 if (funct3 == 3'b010) begin
                     reg_write   = 1'b1;
                     mem_to_reg  = 1'b1;
                     alu_src     = 1'b1;
-                    alu_control = 2'b00;
+                    alu_control = 3'b000;
                     imm_type    = 2'b00;
                 end else begin
                     illegal_instruction = 1'b1;
                 end
             end
 
-            // S-type store: SW
+            // S-type store: SW.
             7'b0100011: begin
                 if (funct3 == 3'b010) begin
-                    mem_write  = 1'b1;
-                    alu_src    = 1'b1;
-                    alu_control = 2'b00;
-                    imm_type   = 2'b01;
+                    mem_write   = 1'b1;
+                    alu_src     = 1'b1;
+                    alu_control = 3'b000;
+                    imm_type    = 2'b01;
                 end else begin
                     illegal_instruction = 1'b1;
                 end
             end
 
-            // B-type branch: BEQ
+            // B-type branch: BEQ. Subtraction sets zero when operands are equal.
             7'b1100011: begin
                 if (funct3 == 3'b000) begin
                     branch      = 1'b1;
-                    alu_control = 2'b01; // subtract to compare the two registers
+                    alu_control = 3'b001;
                     imm_type    = 2'b10;
                 end else begin
                     illegal_instruction = 1'b1;
@@ -208,7 +218,6 @@ module control_unit (
     end
 
 endmodule
-
 // ===== END src/control_unit.v =====
 
 // ===== BEGIN src/branch_unit.v =====
@@ -220,7 +229,6 @@ module branch_unit (
 );
     assign take_branch = branch_enable & operands_equal;
 endmodule
-
 // ===== END src/branch_unit.v =====
 
 // ===== BEGIN src/instruction_memory.v =====
@@ -241,11 +249,10 @@ module instruction_memory (
         $readmemh("program.hex", memory);
     end
 
-    // This simple teaching memory is word-addressed using byte addresses.
+    // PC uses byte addresses; bits [7:2] select a 32-bit instruction word.
     assign instruction = memory[address[7:2]];
 
 endmodule
-
 // ===== END src/instruction_memory.v =====
 
 // ===== BEGIN src/data_memory.v =====
@@ -277,12 +284,11 @@ module data_memory (
     end
 
 endmodule
-
 // ===== END src/data_memory.v =====
 
 // ===== BEGIN src/riscv_cpu.v =====
 // Top-level single-cycle processor implementing a small RV32I subset.
-// Supported instructions: ADD, SUB, ADDI, LW, SW and BEQ.
+// Supported instructions: ADD, SUB, ADDI, LW, SW, BEQ, AND, OR and XOR.
 module riscv_cpu (
     input  wire        clk,
     input  wire        reset,
@@ -319,7 +325,7 @@ module riscv_cpu (
     wire        mem_to_reg;
     wire        alu_src;
     wire        branch;
-    wire [1:0]  alu_control;
+    wire [2:0]  alu_control;
     wire [1:0]  imm_type;
     wire        take_branch;
 
@@ -363,7 +369,7 @@ module riscv_cpu (
         .instruction(instruction), .imm_type(imm_type), .immediate(immediate)
     );
 
-    // 4. Execute: the second ALU input is either a register or an immediate.
+    // 4. Execute: ALU input B is either a register or an immediate.
     assign alu_operand_b = (alu_src) ? immediate : read_data2;
 
     alu arithmetic_logic_unit (
@@ -371,7 +377,7 @@ module riscv_cpu (
         .alu_control(alu_control), .result(alu_result), .zero(alu_zero)
     );
 
-    // BEQ uses the ALU subtraction result to test whether the registers are equal.
+    // BEQ uses ALU subtraction to test whether the source registers are equal.
     branch_unit branch_checker (
         .branch_enable(branch), .operands_equal(alu_zero), .take_branch(take_branch)
     );
@@ -398,6 +404,5 @@ module riscv_cpu (
     assign destination_debug           = rd;
 
 endmodule
-
 // ===== END src/riscv_cpu.v =====
 
