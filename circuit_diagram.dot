@@ -1,0 +1,47 @@
+digraph RiscVProcessor {
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.42", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labelloc=t, label="32-BIT SINGLE-CYCLE RISC-V PROCESSOR\nSupported instructions: ADD, SUB, ADDI, LW, SW, BEQ", fontsize=20];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, margin="0.14,0.10", color="#334155", penwidth=1.4];
+  edge [fontname="DejaVu Sans", fontsize=9, color="#475569", penwidth=1.2, arrowsize=0.8];
+
+  pc [label="Program Counter\n(PC register)", fillcolor="#DBEAFE"];
+  add4 [label="PC + 4\n(next sequential address)", fillcolor="#E0F2FE"];
+  pcmux [label="Next-PC MUX\n(branch target / PC+4)", shape=diamond, fillcolor="#FDE68A"];
+  imem [label="Instruction Memory\n(32-bit instruction)", fillcolor="#DBEAFE"];
+  cu [label="Control Unit\n(opcode / funct fields)", fillcolor="#EDE9FE"];
+  rf [label="Register File\n32 × 32-bit\n2 read ports, 1 write port", fillcolor="#DCFCE7"];
+  imm [label="Immediate Generator\nI-type, S-type, B-type", fillcolor="#DCFCE7"];
+  srcmux [label="ALU-B MUX\n(register / immediate)", shape=diamond, fillcolor="#FDE68A"];
+  alu [label="ALU\nADD / SUB\nZero flag for BEQ", fillcolor="#FFEDD5"];
+  branch [label="BEQ Branch Decision\n(branch control AND zero)", fillcolor="#FCE7F3"];
+  dmem [label="Data Memory\n64 × 32-bit words\nLW / SW", fillcolor="#FEE2E2"];
+  wbmux [label="Write-back MUX\n(ALU result / memory data)", shape=diamond, fillcolor="#FDE68A"];
+
+  pc -> imem [label="instruction address"];
+  pc -> add4;
+  add4 -> pcmux [label="PC+4"];
+  pcmux -> pc [label="next PC", color="#B45309", penwidth=1.8];
+  imem -> cu [label="instruction fields"];
+  imem -> rf [label="rs1, rs2, rd"];
+  imem -> imm [label="immediate bits"];
+  cu -> rf [label="RegWrite", color="#7C3AED", style=dashed];
+  cu -> srcmux [label="ALUSrc", color="#7C3AED", style=dashed];
+  cu -> alu [label="ALUControl", color="#7C3AED", style=dashed];
+  cu -> dmem [label="MemWrite", color="#7C3AED", style=dashed];
+  cu -> wbmux [label="MemToReg", color="#7C3AED", style=dashed];
+  cu -> branch [label="Branch", color="#7C3AED", style=dashed];
+  rf -> alu [label="read data 1 (A)"];
+  rf -> srcmux [label="read data 2"];
+  imm -> srcmux [label="immediate"];
+  srcmux -> alu [label="operand B"];
+  alu -> dmem [label="address / write data address"];
+  rf -> dmem [label="store data", constraint=false];
+  alu -> wbmux [label="ALU result"];
+  dmem -> wbmux [label="load data"];
+  wbmux -> rf [label="write-back data", color="#15803D", penwidth=1.8];
+  alu -> branch [label="zero flag"];
+  branch -> pcmux [label="take branch / target select", color="#B45309", penwidth=1.8];
+  imm -> pcmux [label="branch offset", color="#B45309", style=dashed];
+
+  note [shape=note, label="Clocked state: PC, Register File and Data Memory update on the rising edge.\nCombinational blocks calculate outputs between clock edges.", fillcolor="#F8FAFC", color="#94A3B8", fontsize=10];
+  {rank=same; note;}
+}
