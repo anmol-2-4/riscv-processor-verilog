@@ -1,0 +1,32 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sun Nov 15 11:17:07 2026
+[*]
+[dumpfile] "/home/anmol/Downloads/riscv_intermediate_project/build/wave.vcd"
+[dumpfile_mtime] "Sat Nov 14 18:22:36 2026"
+[dumpfile_size] 10385
+[savefile] "/home/anmol/Downloads/riscv_intermediate_project/build/riscv_waveforms.gtkw/riscv_waveforms.gtkw"
+[timestart] 0
+[size] 1440 821
+[pos] -27 -24
+*-15.046429 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 278
+[signals_width] 214
+[sst_expanded] 1
+[sst_vpaned_height] 234
+@28
+tb_riscv_cpu.clk
+tb_riscv_cpu.reset
+@22
+tb_riscv_cpu.pc_debug[31:0]
+tb_riscv_cpu.instruction_debug[31:0]
+tb_riscv_cpu.alu_result_debug[31:0]
+@28
+tb_riscv_cpu.reg_write_debug
+tb_riscv_cpu.mem_write_debug
+@22
+tb_riscv_cpu.destination_debug[4:0]
+@23
+tb_riscv_cpu.writeback_debug[31:0]
+[pattern_trace] 1
+[pattern_trace] 0
